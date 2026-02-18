@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AU Structural Bolt Length Selector</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 0; background:#0b0f14; color:#e8eef6; }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 22px; }
+    h1 { font-size: 20px; margin: 0 0 10px; }
+    .sub { color:#b7c4d6; margin:0 0 18px; line-height:1.35; }
+    .grid { display:grid; grid-template-columns: 1.1fr 0.9fr; gap: 14px; }
+    @media (max-width: 820px){ .grid{ grid-template-columns: 1fr; } }
+    .card { background:#111925; border:1px solid #1f2c3d; border-radius:16px; padding:16px; box-shadow: 0 10px 26px rgba(0,0,0,.25); }
+    label { display:block; font-size: 12px; color:#b7c4d6; margin-bottom:6px; }
+    input, select { width:100%; padding:10px 12px; border-radius: 12px; border:1px solid #27384d; background:#0c1420; color:#e8eef6; outline:none; }
+    input:focus, select:focus { border-color:#4b7bd1; }
+    input:disabled, select:disabled { opacity: .55; cursor:not-allowed; }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .btnrow { display:flex; gap:10px; flex-wrap:wrap; margin-top: 10px; }
+    button { padding:10px 12px; border-radius: 12px; border:1px solid #2c405a; background:#13233a; color:#e8eef6; cursor:pointer; }
+    button:hover { filter: brightness(1.08); }
+    .good { color:#7ee787; }
+    .warn { color:#ffcc66; }
+    .bad  { color:#ff7b72; }
+    .resultBox { padding:14px; border-radius: 14px; border:1px solid #2a3d56; background:#0b1422; }
+    .big { font-size: 22px; font-weight: 700; margin: 0 0 6px; }
+    .small { font-size: 12px; color:#b7c4d6; line-height:1.35; margin: 6px 0 0; }
+    .list { margin: 10px 0 0; padding-left: 18px; color:#cfe0f5; }
+    .tag { display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid #2a3d56; background:#0a1526; font-size:12px; color:#b7c4d6; margin-left:6px; }
+    .kpi { display:flex; gap:12px; flex-wrap:wrap; margin-top:10px; }
+    .kpi > div { padding:10px 12px; border:1px solid #22354c; background:#0a1422; border-radius:12px; }
+    .kpi .v { font-weight:700; }
+    .divider { height:1px; background:#1f2c3d; margin:14px 0; }
+    .toggle {
+      display:flex; align-items:center; gap:10px;
+      padding:10px 12px; border-radius:12px; border:1px solid #22354c; background:#0a1422;
+      color:#cfe0f5; margin-top:10px;
+    }
+    .toggle input { width:auto; }
+    .hint { color:#97abc5; font-size:12px; margin-top:8px; line-height:1.35; }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <h1>AU Structural Bolt Length Selector <span class="tag">Hobson length ladder + AS1252-style sizing</span></h1>
+    <p class="sub">
+      Enter your <b>clamping/grip thickness</b>. The tool calculates the required bolt length (measured under head) and selects the
+      <b>next stocked length</b>. Defaults match your shop rule set (1 washer under nut, 2mm paint, 2 clear threads) — toggle to unlock if needed.
+    </p>
+
+    <div class="grid">
+      <!-- INPUT CARD -->
+      <div class="card">
+        <div class="row">
+          <div>
+            <label for="diam">Bolt diameter</label>
+            <select id="diam"></select>
+          </div>
+          <div>
+            <label for="grip">Clamping / grip thickness (mm)</label>
+            <input id="grip" type="number" min="0" step="0.1" value="20" />
+          </div>
+        </div>
+
+        <div style="height:10px"></div>
+
+        <div class="row">
+          <div>
+            <label for="packers">Packers / shims in grip (mm)</label>
+            <input id="packers" type="number" min="0" step="0.1" value="0" />
+          </div>
+          <div>
+            <label for="lengthMode">Stock lengths mode</label>
+            <select id="lengthMode">
+              <option value="hobson" selected>Hobson-style ladder</option>
+              <option value="custom">Custom list (paste)</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="customWrap" style="display:none; margin-top:10px;">
+          <label for="customLengths">Custom stocked lengths (mm) — comma/space separated</label>
+          <input id="customLengths" type="text" placeholder="e.g., 40, 45, 50, 55, 60, 65, 70, 75, 80, 90, 100, 110, 120" />
+          <div class="hint">Tip: paste your supplier’s stocked lengths for the diameter you’re using.</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="toggle">
+          <input type="checkbox" id="unlock" />
+          <div>
+            <div style="font-weight:650;">Unlock settings</div>
+            <div class="hint" style="margin-top:2px;">Off = shop defaults. On = edit washers/paint/projection.</div>
+          </div>
+        </div>
+
+        <div style="height:10px"></div>
+
+        <div class="row">
+          <div>
+            <label for="washersNut">Washers under nut</label>
+            <input id="washersNut" type="number" min="0" step="1" value="1" disabled />
+          </div>
+          <div>
+            <label for="washersHead">Washers under head</label>
+            <input id="washersHead" type="number" min="0" step="1" value="0" disabled />
+          </div>
+        </div>
+
+        <div style="height:10px"></div>
+
+        <div class="row">
+          <div>
+            <label for="paint">Paint allowance (mm)</label>
+            <input id="paint" type="number" min="0" step="0.1" value="2.0" disabled />
+          </div>
+          <div>
+            <label for="projThreads">Projection (clear threads)</label>
+            <input id="projThreads" type="number" min="0" step="1" value="2" disabled />
+          </div>
+        </div>
+
+        <div class="btnrow">
+          <button id="calcBtn">Calculate</button>
+          <button id="copyBtn">Copy result</button>
+          <button id="resetBtn">Reset</button>
+        </div>
+
+        <div class="hint">
+          Washer thickness & nut height are auto by diameter (editable in code if your supplier uses different hardware).
+        </div>
+      </div>
+
+      <!-- OUTPUT CARD -->
+      <div class="card">
+        <div class="resultBox">
+          <p class="big" id="recLine">Recommendation will appear here</p>
+
+          <div class="kpi">
+            <div><div class="small">Required length (calc)</div><div class="v mono" id="reqLen">—</div></div>
+            <div><div class="small">Selected stocked length</div><div class="v mono" id="selLen">—</div></div>
+            <div><div class="small">Projection past nut (est)</div><div class="v mono" id="proj">—</div></div>
+          </div>
+
+          <ul class="list" id="checks"></ul>
+
+          <p class="small" id="autoDims"></p>
+          <p class="small" id="stockInfo"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // Metric coarse pitch (mm)
+  const PITCH = { M12: 1.75, M16: 2.0, M20: 2.5, M24: 3.0, M30: 3.5, M36: 4.0 };
+
+  // Hobson-style structural washer thickness (mm)
+  const WASHER_THK = { M12: 3.1, M16: 3.1, M20: 3.1, M24: 3.4, M30: 3.4, M36: 3.4 };
+
+  // Structural nut height (mm) - conservative max values
+  const NUT_THK_MAX = { M12: 13.1, M16: 17.1, M20: 21.3, M24: 24.2, M30: 30.7, M36: 36.6 };
+
+  // Hobson-style stocked length ladder (mm)
+  const HOBSON_STOCK_LENGTHS = [
+    30,35,40,45,50,55,60,65,70,75,80,85,90,95,100,
+    110,120,130,140,150,160,170,180,190,200,
+    210,220,230,240,250,260,270,280,300,320,330,
+    350,375,390,400,415,425,450,460,470,475,
+    500,525,550,600,650,700,750,800,850,900,1000
+  ];
+
+  // Per-diameter ladder filter (keeps silly picks out; tune to your supplier)
+  const RANGE_BY_DIAM = {
+    M12: { min: 30, max: 450 },
+    M16: { min: 30, max: 650 },
+    M20: { min: 30, max: 700 },
+    M24: { min: 40, max: 700 },
+    M30: { min: 50, max: 1000 },
+    M36: { min: 60, max: 1000 }
+  };
+
+  const diamSel = document.getElementById('diam');
+  const gripEl = document.getElementById('grip');
+  const packersEl = document.getElementById('packers');
+  const lengthModeEl = document.getElementById('lengthMode');
+  const customWrap = document.getElementById('customWrap');
+  const customLengthsEl = document.getElementById('customLengths');
+
+  const unlockEl = document.getElementById('unlock');
+  const washersNutEl = document.getElementById('washersNut');
+  const washersHeadEl = document.getElementById('washersHead');
+  const paintEl = document.getElementById('paint');
+  const projThreadsEl = document.getElementById('projThreads');
+
+  const recLine = document.getElementById('recLine');
+  const reqLenEl = document.getElementById('reqLen');
+  const selLenEl = document.getElementById('selLen');
+  const projEl = document.getElementById('proj');
+  const checksEl = document.getElementById('checks');
+  const autoDimsEl = document.getElementById('autoDims');
+  const stockInfoEl = document.getElementById('stockInfo');
+
+  const calcBtn = document.getElementById('calcBtn');
+  const copyBtn = document.getElementById('copyBtn');
+  const resetBtn = document.getElementById('resetBtn');
+
+  function li(text, cls) {
+    const el = document.createElement('li');
+    el.textContent = text;
+    if (cls) el.className = cls;
+    return el;
+  }
+  function uniqSorted(arr) {
+    return [...new Set(arr)].filter(n => Number.isFinite(n)).sort((a,b)=>a-b);
+  }
+  function parseCustomLengths(str) {
+    const parts = (str || "").replace(/;/g, ",").split(/[\s,]+/g).map(s => s.trim()).filter(Boolean);
+    const nums = parts.map(p => Number(p)).filter(n => Number.isFinite(n) && n > 0);
+    return uniqSorted(nums);
+  }
+  function getStockedLengths(diam) {
+    if (lengthModeEl.value === "custom") {
+      const custom = parseCustomLengths(customLengthsEl.value);
+      return custom.length ? custom : [];
+    }
+    const r = RANGE_BY_DIAM[diam] || { min: 0, max: Infinity };
+    return HOBSON_STOCK_LENGTHS.filter(L => L >= r.min && L <= r.max);
+  }
+  function pickLength(required, series) {
+    for (const L of series) if (L >= required) return L;
+    return null;
+  }
+  function setUnlocked(isUnlocked) {
+    [washersNutEl, washersHeadEl, paintEl, projThreadsEl].forEach(el => el.disabled = !isUnlocked);
+  }
+
+  function calc() {
+    const d = diamSel.value;
+    const grip = Number(gripEl.value) || 0;
+    const packers = Number(packersEl.value) || 0;
+
+    const washersNut = Math.max(0, Math.floor(Number(washersNutEl.value) || 0));
+    const washersHead = Math.max(0, Math.floor(Number(washersHeadEl.value) || 0));
+    const paint = Math.max(0, Number(paintEl.value) || 0);
+    const projThreads = Math.max(0, Math.floor(Number(projThreadsEl.value) || 0));
+
+    const pitch = PITCH[d];
+    const projection = projThreads * pitch;
+
+    const washerThk = WASHER_THK[d] ?? 3.1;
+    const nutThk = NUT_THK_MAX[d] ?? 17.1;
+    const washerStack = (washersNut + washersHead) * washerThk;
+
+    const required = grip + packers + washerStack + nutThk + projection + paint;
+
+    const stocked = getStockedLengths(d);
+    const selected = pickLength(required, stocked);
+
+    const achievedProj = selected == null ? 0 :
+      (selected - (grip + packers + washerStack + nutThk + paint));
+
+    // Render
+    checksEl.innerHTML = "";
+    reqLenEl.textContent = `${required.toFixed(1)} mm`;
+    selLenEl.textContent = selected == null ? "—" : `${selected} mm`;
+    projEl.textContent = selected == null ? "—" : `${achievedProj.toFixed(1)} mm`;
+
+    autoDimsEl.textContent =
+      `Auto dims for ${d}: washer ${washerThk.toFixed(1)}mm each, nut ${nutThk.toFixed(1)}mm (max). ` +
+      `Used: washers (nut ${washersNut} + head ${washersHead}), paint ${paint.toFixed(1)}mm, projection ${projThreads} threads (${projection.toFixed(2)}mm).`;
+
+    if (!stocked.length) {
+      recLine.innerHTML = `No stocked lengths loaded.`;
+      checksEl.appendChild(li(`If using Custom list mode, paste lengths (mm). Otherwise switch back to Hobson ladder.`, "bad"));
+      stockInfoEl.textContent = "";
+      return;
+    }
+
+    stockInfoEl.textContent =
+      (lengthModeEl.value === "custom")
+        ? `Stocked lengths source: Custom list (${stocked.length} lengths).`
+        : `Stocked lengths source: Hobson-style ladder (${stocked.length} lengths after diameter filter).`;
+
+    if (selected == null) {
+      recLine.innerHTML = `No stocked length found for <span class="mono">${d}</span> to meet ${required.toFixed(1)}mm.`;
+      checksEl.appendChild(li(`Increase diameter, or add longer lengths to your stocked list.`, "bad"));
+      checksEl.appendChild(li(
+        `Breakdown: grip ${grip.toFixed(1)} + packers ${packers.toFixed(1)} + washers ${washerStack.toFixed(1)} + nut ${nutThk.toFixed(1)} + projection ${projection.toFixed(2)} + paint ${paint.toFixed(1)} = ${required.toFixed(1)} mm.`,
+        ""
+      ));
+      return;
+    }
+
+    recLine.innerHTML = `Use: <span class="mono">${d} × ${selected}</span> structural bolt (assembly).`;
+
+    const projOk = achievedProj + 1e-9 >= projection;
+    checksEl.appendChild(li(
+      `Projection target: ≥ ${projection.toFixed(2)}mm; achieved ≈ ${achievedProj.toFixed(1)}mm.`,
+      projOk ? "good" : "bad"
+    ));
+
+    if (achievedProj > 18) {
+      checksEl.appendChild(li(
+        `Projection is fairly long (>18mm). You may be able to drop one length if still meets projection target.`,
+        "warn"
+      ));
+    }
+
+    checksEl.appendChild(li(
+      `Breakdown: grip ${grip.toFixed(1)} + packers ${packers.toFixed(1)} + washers ${washerStack.toFixed(1)} + nut ${nutThk.toFixed(1)} + projection ${projection.toFixed(2)} + paint ${paint.toFixed(1)} = ${required.toFixed(1)} mm.`,
+      ""
+    ));
+  }
+
+  async function copyResult() {
+    const lines = [
+      recLine.textContent,
+      `Required length: ${reqLenEl.textContent}`,
+      `Selected length: ${selLenEl.textContent}`,
+      `Projection (est): ${projEl.textContent}`,
+      autoDimsEl.textContent,
+      stockInfoEl.textContent
+    ].filter(Boolean).join("\n");
+
+    try {
+      await navigator.clipboard.writeText(lines);
+      copyBtn.textContent = "Copied!";
+      setTimeout(() => copyBtn.textContent = "Copy result", 900);
+    } catch {
+      alert("Copy failed (browser blocked clipboard).");
+    }
+  }
+
+  function reset() {
+    diamSel.value = "M16";
+    gripEl.value = 20;
+    packersEl.value = 0;
+    lengthModeEl.value = "hobson";
+    customLengthsEl.value = "";
+
+    unlockEl.checked = false;
+    washersNutEl.value = 1;
+    washersHeadEl.value = 0;
+    paintEl.value = 2.0;
+    projThreadsEl.value = 2;
+    setUnlocked(false);
+
+    customWrap.style.display = "none";
+    calc();
+  }
+
+  function populateDiameters() {
+    const diams = Object.keys(PITCH);
+    diamSel.innerHTML = diams.map(d => `<option value="${d}">${d}</option>`).join('');
+    diamSel.value = "M16";
+  }
+
+  // Wire up
+  populateDiameters();
+  setUnlocked(false);
+  calc();
+
+  lengthModeEl.addEventListener('input', () => {
+    customWrap.style.display = (lengthModeEl.value === "custom") ? "block" : "none";
+    calc();
+  });
+
+  unlockEl.addEventListener('change', () => {
+    setUnlocked(unlockEl.checked);
+    calc();
+  });
+
+  [diamSel, gripEl, packersEl, washersNutEl, washersHeadEl, paintEl, projThreadsEl, customLengthsEl]
+    .forEach(el => el.addEventListener('input', calc));
+
+  calcBtn.addEventListener('click', calc);
+  copyBtn.addEventListener('click', copyResult);
+  resetBtn.addEventListener('click', reset);
+})();
+</script>
+</body>
+</html>
